@@ -1,6 +1,9 @@
 const express = require('express');
 const router  = express.Router();
 
+const path = require('path');
+const pdf = require('pdf-poppler');
+
 const { fromPath } = require("pdf2pic");
 
 const  {createWorker} = require('tesseract.js');
@@ -16,18 +19,19 @@ let storage = multer.diskStorage({
         cb(null, 'temp/');
     },
     filename: function (req, file, cb) {
-        cb(null, file.originalname);
+        const timeStamp = new Date;
+        cb(null, `${timeStamp.getTime()+path.extname(file.originalname)}`);
     }
 });
 
 let upload = multer({ storage: storage });
 
 router.post("/getText",upload.single("file"),async(req,res,next)=>{
-    pdf2pic(req.file.path)
+    await augFile(req.file.path);
 });
 
 const tesseractify = (file)=>{
-    fs.readFile(req.file.path,async(err,data)=>{
+    fs.readFile(file,async(err,data)=>{
         if(err) return err;
         console.log(data);
 
@@ -36,33 +40,26 @@ const tesseractify = (file)=>{
             await worker.loadLanguage('eng');
             await worker.initialize('eng');
             const { data: { text } } = await worker.recognize(data);
-            res.json({
-                msg:'SUCCESS',
-                text
-            })
+            console.log(text);
             await worker.terminate();
           })();
 
     })
 }
 
-const pdf2pic = (path) =>{
-    const options = {
-        density: 100,
-        saveFilename: "untitled",
-        savePath: "./tempImages",
-        format: "png",
-        width: 600,
-        height: 600
-      };
-      const storeAsImage = fromPath(path, options);
-      const pageToConvertAsImage = 1;
-      
-      storeAsImage(pageToConvertAsImage).then((resolve) => {
-        console.log("PDF has Been converted to images");
-      
-        return resolve;
-      });
+const augFile = (file) =>{
+
+    let opts = {
+        format: 'jpeg',
+        out_dir: './tempImages',
+        out_prefix: path.basename(file, path.extname(file)),
+        page: null
+    }
+     
+    pdf.convert(file, opts).then(res=>{
+        console.log(res)
+    });
+
 }
 
 module.exports = router;
